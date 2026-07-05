@@ -1,0 +1,14 @@
+# Ignore python cache and virtual environments
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+env/
+
+# Ignore sensitive configuration
+.env
+nyayamitra/.env
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

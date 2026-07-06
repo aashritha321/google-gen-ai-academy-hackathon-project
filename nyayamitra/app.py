@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import numpy as np
 import faiss
@@ -305,8 +306,24 @@ List the exact article or section numbers from the retrieved legal context or li
 ### 3. SIMPLE EXPLANATION
 Explain what the laws mean and how they apply to the user's issue in plain, simple, everyday language. Avoid complex legalese.
 
+
 ### 4. STEP-BY-STEP ACTION PLAN
-Provide a sequential, actionable list of steps the user should take next (e.g., draft a reply, visit a local station, lodge a grievance, consult a specific professional).
+
+Return ONLY plain text.
+
+Example:
+
+1. File an FIR.
+2. Block your SIM.
+3. Visit the CEIR portal.
+4. Preserve purchase proof.
+
+DO NOT use HTML.
+DO NOT use Markdown.
+DO NOT use XML.
+DO NOT use code blocks.
+DO NOT use <div>, <strong>, <span> or any tags.
+
 
 ### 5. CONFIDENCE LEVEL
 Output a rating: **High Confidence**, **Medium Confidence**, or **Low Confidence**. Ground this rating explicitly on the provided Search Similarity Scores and Web Grounding accuracy. If similarity scores of the retrieved context are low (e.g., all below 0.60) and search results are sparse, rate as Low Confidence. If there is a high-scoring direct match, rate as High Confidence. Briefly explain your rating based on these signals.
@@ -379,7 +396,7 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
         st.error("⚠️ NyayaMitra was unable to generate a response for this query. This can happen if the content triggers AI safety policies or if there is a transient API issue. Please try rephrasing your description (e.g., focus on the legal facts).")
         return
         
-    # Split by headers to extract individual sections
+     # Split by headers to extract individual sections
     headers = [
         "1. ISSUE CLASSIFICATION",
         "2. APPLICABLE LEGAL AUTHORITY",
@@ -389,37 +406,41 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
         "6. RELEVANT EMERGENCY RESOURCES",
         "7. DISCLAIMER"
     ]
-    
-    # We will search for occurrences of these headers and extract blocks
-    content_blocks = {}
-    remaining_text = answer_text
-    
-    for i, header in enumerate(headers):
-        next_header = headers[i+1] if i + 1 < len(headers) else None
-        
-        # Search for header index
-        start_idx = remaining_text.find(header)
-        if start_idx != -1:
-            # If found, extract content until the next header
-            header_end = start_idx + len(header)
-            if next_header:
-                end_idx = remaining_text.find(next_header)
-                if end_idx != -1:
-                    block_content = remaining_text[header_end:end_idx].strip()
-                else:
-                    block_content = remaining_text[header_end:].strip()
-            else:
-                block_content = remaining_text[header_end:].strip()
-            
-            content_blocks[header] = block_content
-        else:
-            # Fallback if header format differs slightly
-            content_blocks[header] = ""
-            
-    # Clean up formatting (like leading dashes, colons)
-    for key in content_blocks:
-        content_blocks[key] = content_blocks[key].lstrip(":\n -*").strip()
 
+    content_blocks = {}
+
+    for i, header in enumerate(headers):
+        pattern = re.escape(header)
+
+        if i + 1 < len(headers):
+            next_pattern = re.escape(headers[i + 1])
+            match = re.search(
+                pattern + r"(.*?)" + next_pattern,
+                answer_text,
+                flags=re.DOTALL,
+            )
+        else:
+            match = re.search(
+                pattern + r"(.*)",
+                answer_text,
+                flags=re.DOTALL,
+            )
+
+        if match:
+            content_blocks[header] = match.group(1).strip()
+        else:
+            content_blocks[header] = ""
+
+    # Clean up formatting
+    for key in content_blocks:
+        content_blocks[key] = (
+        content_blocks[key]
+        .replace("###", "")
+        .replace("##", "")
+        .replace("#", "")
+        .lstrip(":\n -*")
+        .strip()
+    )
     # --- Render Issue Classification ---
     issue_class = content_blocks.get("1. ISSUE CLASSIFICATION", "General")
     chip_class = "chip-default"
@@ -435,7 +456,8 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     elif "constitution" in lower_class:
         chip_class = "chip-constitutional"
         
-    st.markdown(f"""
+    st.markdown(f"""    
+    
     <div class="premium-card">
         <div class="card-header">⚖️ Issue Classification</div>
         <span class="legal-chip {chip_class}">{issue_class}</span>
@@ -466,26 +488,42 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     
     # --- Render Action Plan ---
     plan_text = content_blocks.get("4. STEP-BY-STEP ACTION PLAN", "")
-    plan_lines = [line.strip() for line in plan_text.split('\n') if line.strip()]
+    plan_text = re.sub(r"<[^>]+>", "", plan_text)
+
+    # Convert markdown bullets/numbers into timeline items
     timeline_html = ""
-    for line in plan_lines:
-        # Strip number prefixes like "1. ", "Step 1: " etc if they exist
-        clean_line = line.lstrip("0123456789. -*")
-        timeline_html += f"""
-        <div class="timeline-item">
-            <div class="timeline-marker"></div>
-            <div class="timeline-text">{clean_line}</div>
-        </div>
-        """
-    st.markdown(f"""
-    <div class="premium-card">
-        <div class="card-header">🎯 Step-by-Step Action Plan</div>
-        <div class="timeline">
-            {timeline_html if timeline_html else plan_text}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+
+    for line in plan_text.splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        # Skip markdown headings
+        if line.startswith("#"):
+            continue
+
+        # Remove markdown bullets/numbers
+        line = re.sub(r"^[-*]\s*", "", line)
+        line = re.sub(r"^\d+\.\s*", "", line)
+
+        # Convert bold markdown to HTML
+        line = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", line)
+
+        timeline_html += (
+            f'<div class="timeline-item">'
+            f'<div class="timeline-marker"></div>'
+            f'<div class="timeline-text">{line}</div>'
+            f'</div>'
+        )
+
+    action_plan_inner = timeline_html if timeline_html else plan_text.replace("\n", "<br>")
+    st.markdown(
+        f'<div class="premium-card"><div class="card-header">🎯 Step-by-Step Action Plan</div>'
+        f'<div class="timeline">{action_plan_inner}</div></div>',
+        unsafe_allow_html=True,
+    )
+
     # --- Render Confidence ---
     conf_text = content_blocks.get("5. CONFIDENCE LEVEL", "")
     st.markdown(f"""
@@ -499,16 +537,50 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     
     # --- Render Emergency Resources ---
     res_text = content_blocks.get("6. RELEVANT EMERGENCY RESOURCES", "")
+
     if res_text and "no direct" not in res_text.lower():
+
+        raw_html = res_text.replace("\n", "<br>")
+
+        def _linkify_phone(match):
+            prefix, number = match.group(1), match.group(2)
+            tel_number = re.sub(r"[\s\-]", "", number)
+            return f'{prefix}<a href="tel:{tel_number}">{number}</a>'
+
+        def _linkify_segment(segment):
+            # Bare domains/portals without a scheme, e.g. "ceir.gov.in"
+            segment = re.sub(
+                r'\b((?:[a-zA-Z0-9-]+\.)+(?:gov\.in|nic\.in|co\.in|org\.in|com|org|net|in))\b',
+                r'<a href="https://\1" target="_blank">\1</a>',
+                segment
+            )
+            # Phone/helpline numbers, e.g. "Police Emergency: 112"
+            segment = re.sub(
+                r'(:\s*)(\d[\d\s\-]{1,14}\d)(?!\d)',
+                _linkify_phone,
+                segment
+            )
+            return segment
+
+        # Process full http(s) URLs first, then only linkify the remaining
+        # plain-text pieces so we never re-wrap something already inside <a>...</a>
+        pieces = re.split(r'(https?://[^\s<]+)', raw_html)
+        for i, piece in enumerate(pieces):
+            if piece.startswith("http://") or piece.startswith("https://"):
+                pieces[i] = f'<a href="{piece}" target="_blank">{piece}</a>'
+            else:
+                pieces[i] = _linkify_segment(piece)
+        res_html = "".join(pieces)
+
         st.markdown(f"""
         <div class="premium-card">
             <div class="card-header">🚨 Relevant Emergency Resources</div>
-            <div style="font-size: 0.95rem; color: #E9ECEF; margin-bottom: 0.8rem;">
-                {res_text.replace('\n', '<br>')}
+            <div style="font-size: 0.9rem; color: #E9ECEF; margin-bottom: 0.8rem;">
+                {res_html}
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
+
     # --- Render Disclaimer ---
     disc_text = content_blocks.get("7. DISCLAIMER", "")
     if not disc_text:

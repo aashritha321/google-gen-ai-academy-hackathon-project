@@ -198,7 +198,7 @@ def load_vector_store():
 # Initialize the genai client
 @st.cache_resource
 def get_genai_client():
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
     return genai.Client(api_key=api_key)
 
 # Function to get query embedding vector

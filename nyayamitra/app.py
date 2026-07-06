@@ -21,7 +21,8 @@ st.set_page_config(
 load_dotenv()
 
 # Inject modern, premium custom CSS (Dark Mode and Glassmorphism aesthetics)
-st.markdown("""
+
+        font-size: 0.st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
@@ -113,8 +114,7 @@ st.markdown("""
         background-color: #FFB703;
         border: 2px solid #0E1117;
     }
-    .timeline-text {
-        font-size: 0.95rem;
+    .timeline-text {95rem;
         line-height: 1.4;
     }
     
@@ -469,7 +469,7 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     st.markdown(f"""
     <div class="premium-card">
         <div class="card-header">📜 Applicable Legal Authority</div>
-        <div style="font-size: 1rem; line-height: 1.5; color: #E9ECEF;">
+        <div style="font-size: 1rem; line-height: 1.5; color:var(--text-color);">
             {auth_text.replace('\n', '<br>')}
         </div>
     </div>
@@ -480,7 +480,7 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     st.markdown(f"""
     <div class="premium-card">
         <div class="card-header">📖 Simple Explanation</div>
-        <div style="font-size: 1rem; line-height: 1.6; color: #E9ECEF;">
+        <div style="font-size: 1rem; line-height: 1.6; color: var(--text-color);">
             {expl_text.replace('\n', '<br>')}
         </div>
     </div>
@@ -529,7 +529,7 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
     st.markdown(f"""
     <div class="premium-card">
         <div class="card-header">🛡️ Confidence Level</div>
-        <div style="font-size: 1rem; color: #E9ECEF;">
+        <div style="font-size: 1rem; color: var(--text-color);">
             {conf_text.replace('\n', '<br>')}
         </div>
     </div>
@@ -575,7 +575,7 @@ def parse_markdown_to_premium_ui(answer_text, retrieved_docs, grounding_metadata
         st.markdown(f"""
         <div class="premium-card">
             <div class="card-header">🚨 Relevant Emergency Resources</div>
-            <div style="font-size: 0.9rem; color: #E9ECEF; margin-bottom: 0.8rem;">
+            <div style="font-size: 0.9rem; color: var(--text-color); margin-bottom: 0.8rem;">
                 {res_html}
             </div>
         </div>

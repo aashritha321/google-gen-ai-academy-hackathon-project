@@ -21,8 +21,7 @@ st.set_page_config(
 load_dotenv()
 
 # Inject modern, premium custom CSS (Dark Mode and Glassmorphism aesthetics)
-
-        font-size: 0.st.markdown("""
+st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
@@ -197,8 +196,13 @@ def load_vector_store():
 
 # Initialize the genai client
 @st.cache_resource
+@st.cache_resource
 def get_genai_client():
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        api_key = st.secrets["GEMINI_API_KEY"]
+
     return genai.Client(api_key=api_key)
 
 # Function to get query embedding vector
